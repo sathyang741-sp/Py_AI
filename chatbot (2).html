@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PersonaAI — Custom Instruction Chatbot</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --bg-elev: #121826;
+      --bg-panel: #161e2e;
+      --bg-input: #0e1420;
+      --border: #243047;
+      --text: #e6edf7;
+      --text-muted: #93a4bd;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --accent-soft: rgba(99, 102, 241, 0.14);
+      --user-bubble: #4f46e5;
+      --user-text: #ffffff;
+      --bot-bubble: #161e2e;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --code-bg: #0a0e16;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      --radius: 14px;
+    }
+
+    [data-theme="light"] {
+      --bg: #f4f6fb;
+      --bg-elev: #ffffff;
+      --bg-panel: #ffffff;
+      --bg-input: #f8fafc;
+      --border: #dbe3ef;
+      --text: #0f172a;
+      --text-muted: #5b6b82;
+      --accent: #4f46e5;
+      --accent-hover: #4338ca;
+      --accent-soft: rgba(79, 70, 229, 0.1);
+      --user-bubble: #4f46e5;
+      --user-text: #ffffff;
+      --bot-bubble: #ffffff;
+      --code-bg: #0f172a;
+      --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+
+    .app {
+      display: flex;
+      height: 100dvh;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 340px;
+      min-width: 340px;
+      background: var(--bg-elev);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.25s ease, margin-left 0.25s ease;
+      z-index: 30;
+    }
+    .sidebar.collapsed { margin-left: -340px; }
+
+    .sidebar-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    .sidebar-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .badge.active { background: rgba(16, 185, 129, 0.16); color: var(--success); }
+    .badge.unsaved { background: rgba(245, 158, 11, 0.16); color: var(--warning); }
+
+    .field-input, .field-select, .field-textarea {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .field-input:focus, .field-select:focus, .field-textarea:focus {
+      border-color: var(--accent);
+    }
+    .field-textarea {
+      min-height: 150px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .key-row {
+      display: flex;
+      gap: 6px;
+    }
+    .key-row .field-input { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+
+    .hint {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      line-height: 1.45;
+    }
+    .hint a { color: var(--accent); text-decoration: none; }
+    .hint a:hover { text-decoration: underline; }
+
+    .presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .preset-btn {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 6px 11px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .preset-btn:hover, .preset-btn.selected {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .row-between {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+    .switch {
+      position: relative;
+      width: 38px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .slider::before {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: 0.2s;
+    }
+    .switch input:checked + .slider { background: var(--accent); }
+    .switch input:checked + .slider::before { transform: translateX(16px); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 13px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: var(--danger);
+    }
+    .btn-danger:hover { background: var(--danger); color: #fff; }
+    .btn-sm { padding: 6px 10px; font-size: 12px; }
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      border-radius: 10px;
+    }
+
+    /* Main chat area */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--bg);
+    }
+
+    .topbar {
+      height: 60px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-elev);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .topbar-left, .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .active-persona {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      flex-shrink: 0;
+    }
+    .status-dot.missing { background: var(--warning); }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .empty-state {
+      margin: auto;
+      max-width: 520px;
+      text-align: center;
+      padding: 24px;
+    }
+    .empty-state h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+    .empty-state p {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 18px;
+    }
+    .starters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+    }
+    .starter-card {
+      text-align: left;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-elev);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .starter-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .msg-row {
+      display: flex;
+      gap: 12px;
+      max-width: 860px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .msg-row.user { flex-direction: row-reverse; }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .msg-row.user .avatar { background: var(--accent); color: #fff; }
+    .msg-row.model .avatar { background: var(--bg-panel); border: 1px solid var(--border); color: var(--accent); }
+
+    .bubble {
+      max-width: min(760px, 85%);
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 14.5px;
+      line-height: 1.65;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+    }
+    .msg-row.user .bubble {
+      background: var(--user-bubble);
+      color: var(--user-text);
+      border-bottom-right-radius: 4px;
+      white-space: pre-wrap;
+    }
+    .msg-row.model .bubble {
+      background: var(--bot-bubble);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+    .msg-row.error .bubble {
+      border-color: rgba(239, 68, 68, 0.5);
+      background: rgba(239, 68, 68, 0.08);
+      color: var(--text);
+    }
+
+    /* Markdown elements inside bot bubbles */
+    .bubble h1, .bubble h2, .bubble h3 { margin: 12px 0 6px; line-height: 1.3; }
+    .bubble h1 { font-size: 18px; }
+    .bubble h2 { font-size: 16px; }
+    .bubble h3 { font-size: 15px; }
+    .bubble p { margin: 0 0 10px; }
+    .bubble p:last-child { margin-bottom: 0; }
+    .bubble ul, .bubble ol { margin: 6px 0 10px 20px; }
+    .bubble li { margin-bottom: 4px; }
+    .bubble blockquote {
+      border-left: 3px solid var(--accent);
+      padding: 6px 12px;
+      margin: 8px 0;
+      background: var(--accent-soft);
+      border-radius: 0 8px 8px 0;
+      color: var(--text-muted);
+    }
+    .bubble code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12.5px;
+      background: rgba(148, 163, 184, 0.16);
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+    .code-block {
+      margin: 10px 0;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+    }
+    .code-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #94a3b8;
+      font-size: 11.5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .code-copy {
+      background: transparent;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: #e2e8f0;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .code-copy:hover { border-color: #818cf8; color: #fff; }
+    .code-block pre {
+      margin: 0;
+      padding: 12px;
+      overflow-x: auto;
+      color: #e2e8f0;
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+    .code-block pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+    }
+    .citations {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .citation-chip {
+      font-size: 11.5px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .citation-chip:hover { text-decoration: underline; }
+
+    /* Typing dots */
+    .typing {
+      display: inline-flex;
+      gap: 5px;
+      align-items: center;
+      padding: 4px 2px;
+    }
+    .typing span {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      animation: bounce 1.2s infinite ease-in-out;
+    }
+    .typing span:nth-child(2) { animation-delay: 0.15s; }
+    .typing span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Composer */
+    .composer-wrap {
+      padding: 12px 18px 18px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-elev);
+    }
+    .composer {
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 8px 10px;
+    }
+    .composer:focus-within { border-color: var(--accent); }
+    .composer textarea {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14.5px;
+      line-height: 1.5;
+      max-height: 160px;
+      resize: none;
+      padding: 4px 6px;
+    }
+    .composer-note {
+      max-width: 860px;
+      margin: 6px auto 0;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    /* Modal & backdrop */
+    .backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 25;
+    }
+    .backdrop.show { display: block; }
+
+    .modal-wrap {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-wrap.show { display: flex; }
+    .modal {
+      width: 100%;
+      max-width: 400px;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    .modal h3 { margin-bottom: 8px; font-size: 16px; }
+    .modal p { color: var(--text-muted); font-size: 13.5px; line-height: 1.5; margin-bottom: 18px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+    .toast {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      background: var(--bg-panel);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: all 0.2s ease;
+      z-index: 60;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 860px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(340px, 88vw);
+        min-width: 0;
+        margin-left: 0 !important;
+        transform: translateX(-100%);
+      }
+      .sidebar.mobile-open { transform: translateX(0); }
+      .hide-sm { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div id="backdrop" class="backdrop"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-icon">P</div>
+          <span>PersonaAI</span>
+        </div>
+        <button id="closeSidebarBtn" class="btn icon-btn" title="Toggle sidebar">✕</button>
+      </div>
+
+      <div class="sidebar-body">
+        <!-- API Key -->
+        <div>
+          <div class="section-label">
+            <span>Gemini API Key</span>
+            <span id="keyBadge" class="badge unsaved">Not set</span>
+          </div>
+          <div class="key-row">
+            <input id="apiKeyInput" type="password" class="field-input" placeholder="AIzaSy..." autocomplete="off" />
+            <button id="toggleKeyVis" class="btn btn-sm" title="Show/Hide">Show</button>
+          </div>
+          <div class="row-between" style="margin-top:8px;">
+            <label style="font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input id="rememberKey" type="checkbox" checked /> Save in browser only
+            </label>
+            <button id="saveKeyBtn" class="btn btn-primary btn-sm">Save Key</button>
+          </div>
+          <p class="hint">
+            Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.
+            Stored only in your browser—never exposed in the HTML file unless hardcoded.
+          </p>
+        </div>
+
+        <!-- Model selector -->
+        <div>
+          <div class="section-label"><span>Model</span></div>
+          <select id="modelSelect" class="field-select">
+            <option value="gemini-4-hydrogen">Gemini 4 Hydrogen (Recommended · Free tier)</option>
+            <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Fastest · Free tier)</option>
+            <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+            <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+          </select>
+        </div>
+
+        <!-- Presets -->
+        <div>
+          <div class="section-label"><span>Persona Presets</span></div>
+          <div id="presetList" class="presets"></div>
+        </div>
+
+        <!-- Custom Instructions -->
+        <div>
+          <div class="section-label">
+            <span>Custom Instructions</span>
+            <span id="promptBadge" class="badge active">Active</span>
+          </div>
+          <textarea id="systemPrompt" class="field-textarea" placeholder="Define how the chatbot should behave, its tone, rules, and expertise..."></textarea>
+          <div class="row-between" style="margin-top:8px;">
+            <span id="charCount" style="font-size:11.5px; color:var(--text-muted);">0 chars</span>
+            <button id="applyPromptBtn" class="btn btn-primary btn-sm">Apply Instructions</button>
+          </div>
+        </div>
+
+        <!-- Live Web Search -->
+        <div class="toggle-row">
+          <div>
+            <div style="font-weight:600; font-size:13px;">Google Search Grounding</div>
+            <div style="font-size:11.5px; color:var(--text-muted);">Requires billing-enabled API key</div>
+          </div>
+          <label class="switch">
+            <input id="searchToggle" type="checkbox" />
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <!-- Actions -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <button id="copyLogBtn" class="btn btn-sm">Copy Log</button>
+          <button id="exportMdBtn" class="btn btn-sm">Export .md</button>
+        </div>
+        <button id="clearChatBtn" class="btn btn-danger btn-sm" style="width:100%;">Clear Conversation</button>
+      </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="openSidebarBtn" class="btn icon-btn" title="Open settings">☰</button>
+          <span id="statusDot" class="status-dot missing"></span>
+          <span id="activePersonaLabel" class="active-persona">General Assistant</span>
+        </div>
+        <div class="topbar-right">
+          <button id="themeBtn" class="btn btn-sm">Light Mode</button>
+        </div>
+      </header>
+
+      <section id="messages" class="messages"></section>
+
+      <div class="composer-wrap">
+        <div class="composer">
+          <textarea id="userInput" rows="1" placeholder="Type your message... (Enter to send, Shift+Enter for new line)"></textarea>
+          <button id="sendBtn" class="btn btn-primary">Send</button>
+        </div>
+        <div class="composer-note">
+          <span id="modelFooter">Model: gemini-4-hydrogen</span>
+          <span>Powered by Gemini API</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Clear Confirmation Modal -->
+  <div id="clearModal" class="modal-wrap">
+    <div class="modal">
+      <h3>Clear this conversation?</h3>
+      <p>This will remove all chat messages from the screen and reset the bot's conversation memory. Your custom instructions and API key will stay intact.</p>
+      <div class="modal-actions">
+        <button id="cancelClearBtn" class="btn btn-sm">Cancel</button>
+        <button id="confirmClearBtn" class="btn btn-danger btn-sm">Clear Chat</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // OPTIONAL: Only paste a temporary key here if you want visitors to chat immediately
+    // without entering their own key. Revoke the key in Google AI Studio after your 1-hour session!
+    const HARDCODED_API_KEY = "";
+
+    const PRESETS = [
+      {
+        name: "General Assistant",
+        prompt: "You are a sharp, helpful AI assistant. Give clear, direct, and accurate answers using structured Markdown when useful. Avoid fluff.",
+        starters: [
+          "Summarize the pros and cons of static site hosting in 5 bullets.",
+          "Write a short, punchy bio for a student developer portfolio."
+        ]
+      },
+      {
+        name: "Coding Tutor",
+        prompt: "You are a patient senior software engineer and coding tutor. Explain concepts clearly with minimal, runnable code examples and point out common bugs before they happen.",
+        starters: [
+          "Explain Java OOP polymorphism with a simple real-world example.",
+          "Help me debug why an async fetch() call returns undefined."
+        ]
+      },
+      {
+        name: "Creative Writer",
+        prompt: "You are an imaginative fiction writer and editor. Craft vivid scenes with strong pacing, sharp dialogue, and zero clichés.",
+        starters: [
+          "Write a 150-word opening scene set on a neon-lit rain-soaked metro platform.",
+          "Give me 3 plot twists for a fantasy tournament arc."
+        ]
+      },
+      {
+        name: "Fitness Coach",
+        prompt: "You are an evidence-based strength and hypertrophy coach. Give practical, safe workout and nutrition advice tailored to beginners and intermediates without bro-science.",
+        starters: [
+          "Build a 4-day upper/lower lean hypertrophy workout split.",
+          "Give me 3 high-protein, budget-friendly vegetarian or egg-based meals."
+        ]
+      },
+      {
+        name: "Sarcastic Friend",
+        prompt: "You are a witty, lightly sarcastic best friend. Tease playfully, keep responses concise and funny, but still give genuinely useful answers underneath the banter.",
+        starters: [
+          "Convince me to stop procrastinating and finish my assignment right now.",
+          "Rate my plan to pull an all-nighter before an 8 AM exam."
+        ]
+      }
+    ];
+
+    const state = {
+      apiKey: HARDCODED_API_KEY || localStorage.getItem("persona_ai_key") || "",
+      model: localStorage.getItem("persona_ai_model") || "gemini-4-hydrogen",
+      activePrompt: localStorage.getItem("persona_ai_prompt") || PRESETS[0].prompt,
+      activePresetName: localStorage.getItem("persona_ai_preset") || PRESETS[0].name,
+      useSearch: false,
+      history: [],
+      isGenerating: false
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    const els = {
+      sidebar: $("sidebar"),
+      backdrop: $("backdrop"),
+      openSidebarBtn: $("openSidebarBtn"),
+      closeSidebarBtn: $("closeSidebarBtn"),
+      apiKeyInput: $("apiKeyInput"),
+      toggleKeyVis: $("toggleKeyVis"),
+      rememberKey: $("rememberKey"),
+      saveKeyBtn: $("saveKeyBtn"),
+      keyBadge: $("keyBadge"),
+      statusDot: $("statusDot"),
+      modelSelect: $("modelSelect"),
+      modelFooter: $("modelFooter"),
+      presetList: $("presetList"),
+      systemPrompt: $("systemPrompt"),
+      promptBadge: $("promptBadge"),
+      charCount: $("charCount"),
+      applyPromptBtn: $("applyPromptBtn"),
+      activePersonaLabel: $("activePersonaLabel"),
+      searchToggle: $("searchToggle"),
+      copyLogBtn: $("copyLogBtn"),
+      exportMdBtn: $("exportMdBtn"),
+      clearChatBtn: $("clearChatBtn"),
+      themeBtn: $("themeBtn"),
+      messages: $("messages"),
+      userInput: $("userInput"),
+      sendBtn: $("sendBtn"),
+      clearModal: $("clearModal"),
+      cancelClearBtn: $("cancelClearBtn"),
+      confirmClearBtn: $("confirmClearBtn"),
+      toast: $("toast")
+    };
+
+    function showToast(msg) {
+      els.toast.textContent = msg;
+      els.toast.classList.add("show");
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => els.toast.classList.remove("show"), 2400);
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function renderMarkdown(text) {
+      const codeBlocks = [];
+      let safe = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+        const idx = codeBlocks.length;
+        codeBlocks.push({ lang: lang || "code", code: code.replace(/\n$/, "") });
+        return `@@CODEBLOCK_${idx}@@`;
+      });
+
+      safe = escapeHtml(safe);
+
+      // Headings
+      safe = safe.replace(/^### (.*)$/gm, "<h3>$1</h3>");
+      safe = safe.replace(/^## (.*)$/gm, "<h2>$1</h2>");
+      safe = safe.replace(/^# (.*)$/gm, "<h1>$1</h1>");
+
+      // Blockquotes
+      safe = safe.replace(/^&gt; (.*)$/gm, "<blockquote>$1</blockquote>");
+
+      // Inline code
+      safe = safe.replace(/`([^`\n]+)`/g, "<code>$1</code>");
+
+      // Bold & italic
+      safe = safe.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      safe = safe.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+
+      // Links
+      safe = safe.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:var(--accent);">$1</a>');
+
+      // Lists
+      const lines = safe.split("\n");
+      let html = "";
+      let inUl = false;
+      let inOl = false;
+
+      for (const line of lines) {
+        const ulMatch = line.match(/^\s*[-*]\s+(.*)$/);
+        const olMatch = line.match(/^\s*\d+\.\s+(.*)$/);
+
+        if (ulMatch) {
+          if (inOl) { html += "</ol>"; inOl = false; }
+          if (!inUl) { html += "<ul>"; inUl = true; }
+          html += `<li>${ulMatch[1]}</li>`;
+        } else if (olMatch) {
+          if (inUl) { html += "</ul>"; inUl = false; }
+          if (!inOl) { html += "<ol>"; inOl = true; }
+          html += `<li>${olMatch[1]}</li>`;
+        } else {
+          if (inUl) { html += "</ul>"; inUl = false; }
+          if (inOl) { html += "</ol>"; inOl = false; }
+          if (line.trim() === "") {
+            html += "<br/>";
+          } else if (/^<(h1|h2|h3|blockquote)/.test(line) || /^@@CODEBLOCK_\d+@@$/.test(line.trim())) {
+            html += line;
+          } else {
+            html += `<p>${line}</p>`;
+          }
+        }
+      }
+      if (inUl) html += "</ul>";
+      if (inOl) html += "</ol>";
+
+      html = html.replace(/(<br\/>){2,}/g, "<br/>");
+
+      html = html.replace(/@@CODEBLOCK_(\d+)@@/g, (_, i) => {
+        const blk = codeBlocks[Number(i)];
+        return `
+          <div class="code-block">
+            <div class="code-head">
+              <span>${escapeHtml(blk.lang)}</span>
+              <button class="code-copy" data-code-idx="${i}">Copy</button>
+            </div>
+            <pre><code>${escapeHtml(blk.code)}</code></pre>
+          </div>
+        `;
+      });
+
+      return { html, codeBlocks };
+    }
+
+    function updateKeyStatus() {
+      const hasKey = Boolean(state.apiKey && state.apiKey.trim());
+      els.keyBadge.textContent = hasKey ? "Ready" : "Not set";
+      els.keyBadge.className = "badge " + (hasKey ? "active" : "unsaved");
+      els.statusDot.className = "status-dot" + (hasKey ? "" : " missing");
+    }
+
+    function updatePromptStatus() {
+      const dirty = els.systemPrompt.value.trim() !== state.activePrompt.trim();
+      els.promptBadge.textContent = dirty ? "Unsaved" : "Active";
+      els.promptBadge.className = "badge " + (dirty ? "unsaved" : "active");
+      els.charCount.textContent = `${els.systemPrompt.value.length} chars`;
+    }
+
+    function renderPresets() {
+      els.presetList.innerHTML = "";
+      PRESETS.forEach((p) => {
+        const btn = document.createElement("button");
+        btn.className = "preset-btn" + (p.name === state.activePresetName ? " selected" : "");
+        btn.textContent = p.name;
+        btn.onclick = () => {
+          els.systemPrompt.value = p.prompt;
+          state.activePrompt = p.prompt;
+          state.activePresetName = p.name;
+          localStorage.setItem("persona_ai_prompt", p.prompt);
+          localStorage.setItem("persona_ai_preset", p.name);
+          els.activePersonaLabel.textContent = p.name;
+          updatePromptStatus();
+          renderPresets();
+          if (state.history.length === 0) renderEmptyState();
+          showToast(`Switched persona to ${p.name}`);
+        };
+        els.presetList.appendChild(btn);
+      });
+    }
+
+    function renderEmptyState() {
+      const preset = PRESETS.find((p) => p.name === state.activePresetName) || PRESETS[0];
+      const starters = preset.starters || PRESETS[0].starters;
+      els.messages.innerHTML = `
+        <div class="empty-state">
+          <h1>PersonaAI Studio</h1>
+          <p>
+            Active persona: <strong>${escapeHtml(state.activePresetName)}</strong>.<br/>
+            Customize instructions in the sidebar, paste your Gemini API key if not set, and start chatting.
+          </p>
+          <div class="starters">
+            ${starters.map((s) => `<button class="starter-card">${escapeHtml(s)}</button>`).join("")}
+          </div>
+        </div>
+      `;
+      els.messages.querySelectorAll(".starter-card").forEach((btn) => {
+        btn.onclick = () => {
+          els.userInput.value = btn.textContent;
+          sendMessage();
+        };
+      });
+    }
+
+    function appendMessage(role, text, citations = [], isError = false) {
+      const empty = els.messages.querySelector(".empty-state");
+      if (empty) empty.remove();
+
+      const row = document.createElement("div");
+      row.className = `msg-row ${role}${isError ? " error" : ""}`;
+
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = role === "user" ? "You" : "AI";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+
+      if (role === "user") {
+        bubble.textContent = text;
+      } else {
+        const { html, codeBlocks } = renderMarkdown(text);
+        bubble.innerHTML = html;
+        bubble.querySelectorAll(".code-copy").forEach((btn) => {
+          btn.onclick = () => {
+            const idx = Number(btn.getAttribute("data-code-idx"));
+            navigator.clipboard.writeText(codeBlocks[idx].code);
+            btn.textContent = "Copied!";
+            setTimeout(() => (btn.textContent = "Copy"), 1500);
+          };
+        });
+        if (citations.length) {
+          const cWrap = document.createElement("div");
+          cWrap.className = "citations";
+          citations.forEach((c) => {
+            const a = document.createElement("a");
+            a.className = "citation-chip";
+            a.href = c.uri;
+            a.target = "_blank";
+            a.rel = "noopener";
+            a.textContent = c.title || c.uri;
+            cWrap.appendChild(a);
+          });
+          bubble.appendChild(cWrap);
+        }
+      }
+
+      row.appendChild(avatar);
+      row.appendChild(bubble);
+      els.messages.appendChild(row);
+      els.messages.scrollTop = els.messages.scrollHeight;
+      return row;
+    }
+
+    function showTyping() {
+      const empty = els.messages.querySelector(".empty-state");
+      if (empty) empty.remove();
+
+      const row = document.createElement("div");
+      row.className = "msg-row model";
+      row.id = "typingRow";
+      row.innerHTML = `
+        <div class="avatar">AI</div>
+        <div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>
+      `;
+      els.messages.appendChild(row);
+      els.messages.scrollTop = els.messages.scrollHeight;
+    }
+
+    function hideTyping() {
+      const row = $("typingRow");
+      if (row) row.remove();
+    }
+
+    async function sendMessage() {
+      if (state.isGenerating) return;
+      const text = els.userInput.value.trim();
+      if (!text) return;
+
+      if (!state.apiKey.trim()) {
+        showToast("Please add your Gemini API key in the sidebar first.");
+        openSidebar();
+        els.apiKeyInput.focus();
+        return;
+      }
+
+      // Auto-apply edited prompt if user forgot to click Apply
+      if (els.systemPrompt.value.trim() !== state.activePrompt.trim()) {
+        state.activePrompt = els.systemPrompt.value.trim();
+        localStorage.setItem("persona_ai_prompt", state.activePrompt);
+        updatePromptStatus();
+      }
+
+      els.userInput.value = "";
+      els.userInput.style.height = "auto";
+      appendMessage("user", text);
+      state.history.push({ role: "user", parts: [{ text }] });
+
+      state.isGenerating = true;
+      els.sendBtn.disabled = true;
+      showTyping();
+
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.model)}:generateContent?key=${encodeURIComponent(state.apiKey.trim())}`;
+        const body = {
+          contents: state.history
+        };
+        if (state.activePrompt.trim()) {
+          body.systemInstruction = {
+            parts: [{ text: state.activePrompt.trim() }]
+          };
+        }
+        if (state.useSearch) {
+          body.tools = [{ google_search: {} }];
+        }
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+
+        const data = await res.json();
+        hideTyping();
+
+        if (!res.ok) {
+          const errMsg = data?.error?.message || `HTTP ${res.status} error from Gemini API.`;
+          state.history.pop();
+          appendMessage("model", `**API Error:** ${errMsg}\n\nTip: Check that your Gemini API key is valid and that your selected model (\`${state.model}\`) is enabled for your key.`, [], true);
+          return;
+        }
+
+        const candidate = data?.candidates?.[0];
+        const parts = candidate?.content?.parts || [];
+        const replyText = parts.filter((p) => !p.thought && p.text).map((p) => p.text).join("") || "No response text returned.";
+
+        const chunks = candidate?.groundingMetadata?.groundingChunks || [];
+        const citations = chunks
+          .filter((c) => c.web?.uri)
+          .map((c) => ({ title: c.web.title, uri: c.web.uri }));
+
+        // Preserve exact model parts for multi-turn compatibility (including thought signatures if returned)
+        state.history.push({ role: "model", parts });
+        appendMessage("model", replyText, citations);
+      } catch (err) {
+        hideTyping();
+        state.history.pop();
+        appendMessage("model", `**Network Error:** ${err.message}`, [], true);
+      } finally {
+        state.isGenerating = false;
+        els.sendBtn.disabled = false;
+        els.userInput.focus();
+      }
+    }
+
+    function openSidebar() {
+      if (window.innerWidth <= 860) {
+        els.sidebar.classList.add("mobile-open");
+        els.backdrop.classList.add("show");
+      } else {
+        els.sidebar.classList.remove("collapsed");
+      }
+    }
+
+    function closeSidebar() {
+      if (window.innerWidth <= 860) {
+        els.sidebar.classList.remove("mobile-open");
+        els.backdrop.classList.remove("show");
+      } else {
+        els.sidebar.classList.add("collapsed");
+      }
+    }
+
+    function buildMarkdownLog() {
+      const header = `# PersonaAI Chat Log\n\n**Persona:** ${state.activePresetName}\n**Model:** ${state.model}\n\n**System Instructions:**\n> ${state.activePrompt.replace(/\n/g, "\n> ")}\n\n---\n\n`;
+      const body = state.history.map((m) => {
+        const label = m.role === "user" ? "### You" : "### Assistant";
+        const txt = (m.parts || []).filter((p) => !p.thought && p.text).map((p) => p.text).join("");
+        return `${label}\n\n${txt}\n`;
+      }).join("\n");
+      return header + body;
+    }
+
+    // Event wiring
+    els.openSidebarBtn.onclick = () => {
+      if (window.innerWidth <= 860) {
+        els.sidebar.classList.contains("mobile-open") ? closeSidebar() : openSidebar();
+      } else {
+        els.sidebar.classList.toggle("collapsed");
+      }
+    };
+    els.closeSidebarBtn.onclick = closeSidebar;
+    els.backdrop.onclick = closeSidebar;
+
+    els.toggleKeyVis.onclick = () => {
+      const hidden = els.apiKeyInput.type === "password";
+      els.apiKeyInput.type = hidden ? "text" : "password";
+      els.toggleKeyVis.textContent = hidden ? "Hide" : "Show";
+    };
+
+    els.saveKeyBtn.onclick = () => {
+      state.apiKey = els.apiKeyInput.value.trim();
+      if (els.rememberKey.checked && state.apiKey) {
+        localStorage.setItem("persona_ai_key", state.apiKey);
+      } else {
+        localStorage.removeItem("persona_ai_key");
+      }
+      updateKeyStatus();
+      showToast(state.apiKey ? "API key saved in browser" : "API key cleared");
+    };
+
+    els.modelSelect.onchange = () => {
+      state.model = els.modelSelect.value;
+      localStorage.setItem("persona_ai_model", state.model);
+      els.modelFooter.textContent = `Model: ${state.model}`;
+      showToast(`Model set to ${state.model}`);
+    };
+
+    els.systemPrompt.oninput = updatePromptStatus;
+    els.applyPromptBtn.onclick = () => {
+      state.activePrompt = els.systemPrompt.value.trim();
+      const matched = PRESETS.find((p) => p.prompt.trim() === state.activePrompt);
+      state.activePresetName = matched ? matched.name : "Custom Persona";
+      els.activePersonaLabel.textContent = state.activePresetName;
+      localStorage.setItem("persona_ai_prompt", state.activePrompt);
+      localStorage.setItem("persona_ai_preset", state.activePresetName);
+      updatePromptStatus();
+      renderPresets();
+      showToast("Custom instructions applied");
+    };
+
+    els.searchToggle.onchange = () => {
+      state.useSearch = els.searchToggle.checked;
+      showToast(state.useSearch ? "Google Search grounding enabled" : "Google Search grounding disabled");
+    };
+
+    els.copyLogBtn.onclick = () => {
+      if (!state.history.length) return showToast("No messages to copy yet");
+      navigator.clipboard.writeText(buildMarkdownLog());
+      showToast("Conversation copied to clipboard");
+    };
+
+    els.exportMdBtn.onclick = () => {
+      if (!state.history.length) return showToast("No messages to export yet");
+      const blob = new Blob([buildMarkdownLog()], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `persona-ai-chat-${Date.now()}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Exported Markdown file");
+    };
+
+    els.clearChatBtn.onclick = () => els.clearModal.classList.add("show");
+    els.cancelClearBtn.onclick = () => els.clearModal.classList.remove("show");
+    els.confirmClearBtn.onclick = () => {
+      state.history = [];
+      els.clearModal.classList.remove("show");
+      renderEmptyState();
+      showToast("Conversation cleared");
+    };
+
+    els.themeBtn.onclick = () => {
+      const cur = document.documentElement.getAttribute("data-theme");
+      const next = cur === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("persona_ai_theme", next);
+      els.themeBtn.textContent = next === "dark" ? "Light Mode" : "Dark Mode";
+    };
+
+    els.sendBtn.onclick = sendMessage;
+    els.userInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    els.userInput.addEventListener("input", () => {
+      els.userInput.style.height = "auto";
+      els.userInput.style.height = Math.min(els.userInput.scrollHeight, 160) + "px";
+    });
+
+    // Init
+    (function init() {
+      const savedTheme = localStorage.getItem("persona_ai_theme") || "dark";
+      document.documentElement.setAttribute("data-theme", savedTheme);
+      els.themeBtn.textContent = savedTheme === "dark" ? "Light Mode" : "Dark Mode";
+
+      els.apiKeyInput.value = state.apiKey;
+      els.modelSelect.value = state.model;
+      els.modelFooter.textContent = `Model: ${state.model}`;
+      els.systemPrompt.value = state.activePrompt;
+      els.activePersonaLabel.textContent = state.activePresetName;
+
+      updateKeyStatus();
+      updatePromptStatus();
+      renderPresets();
+      renderEmptyState();
+    })();
+  </script>
+</body>
+</html>
